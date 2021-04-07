@@ -1,0 +1,291 @@
+---
+title: "Accident"
+author: "MeadhbhHealy"
+date: "20/11/2020"
+output: html_document
+---
+```{r include=FALSE}
+library(pxR)
+library(ggplot2)
+library(effsize)
+library(ggthemes)
+library(plotly)
+library(tidyverse)
+library(plyr)
+library(kableExtra)
+knitr::opts_chunk$set(fig.align='center',fig.width=14, fig.height=8) 
+```
+
+```{r}
+casualty.data<-as.data.frame(read.px("ROA16.px"))
+```
+In this section, we analyze the Age-Group category. We hope to gain insight into high risk age groups on Irish roads, and explore reasons for this.We hope to answer the following:
+1.Which Age Groups represented in the data are the highest risk, and what defining attributes do they share?
+2.Are the least experienced Age Groups necessarily the highest risk? What is the ratio of male/female in these groups?
+3.What are the trends in Age Groups for ten years represented in the data?
+
+---
+
+####1.Which Age Groups represented in the data are the highest risk, and what defining attributes do they share?
+
+To take an initial overview at the highest risk Age Groups we will represent the data visually, categorized by Age Group, hereafter referred to as AG. This is done interactively in the bubble plot below. Each different coloured bubble represents a different AG, and the size of that bubble indicates the amount of people killed or injured in that AG, between the years of 2005-2018. By hovering over a bubble we can see some information regarding this statistic, including Year, Road Type User and Sex.You can isolate a single age group by double clicking on the legend below it.
+```{r include=FALSE}
+All.Road.Users<-subset(casualty.data, !(casualty.data$Statistic=="All Killed and Injured Casualties (Number)"))
+
+All.Road.Users<-All.Road.Users[!(All.Road.Users$Age.Group=="All ages" | All.Road.Users$Age.Group=="Age unknown" | All.Road.Users$Road.User.Type=="All road users" | All.Road.Users$Road.User.Type=="All Car users"),]
+
+All.Road.Users<-All.Road.Users[!(All.Road.Users$Year=="2005" | All.Road.Users$Year=="2006" |
+All.Road.Users$Year=="2007"),]
+
+# shorten Statistic column
+factor.Stat <- as.factor(All.Road.Users$Statistic)
+levels(factor.Stat) <- c("Killed", "Injured", "Killed&Injured")
+# replace Statistic column with new values
+All.Road.Users$Statistic <- factor.Stat
+
+```
+
+```{r fig.width=9.5, fig.height=6.5, echo=FALSE}
+p <- All.Road.Users %>%
+  mutate(Year=Year) %>%
+  mutate(Age.Group=Age.Group) %>%
+  mutate(value=value) %>%
+  mutate(Road.User.Type=Road.User.Type) %>%
+
+mutate(text = paste("Year: ", Year, "\nAge Group: ", Age.Group, "\nAmount: ", value, "\nRoad user: ", Road.User.Type, "\nStatistic: ", Statistic, "\nSex: ", Sex, sep="")) %>%
+ggplot(aes(x=value, y=Year, size = value, color = Age.Group,text=text))+
+    geom_point(alpha=0.5) +
+    scale_size(range = c(1, 23)) +
+    scale_color_manual(values = c( "#ff0066", "#00ff7f", "#cc0099",  "#8080ff", "#bf80ff", "#E7B800", "#cc0000","#5900b3", "#269900", "#00AFBB", "#ffff1a")) +theme_stata() +
+  ggtitle("All serious accidents categorized by age group for types of road user")+
+  labs(x="Number", y="Year")+
+  theme(plot.margin=unit(c(-0.20,1,0,0), "cm"))
+  
+pp <- ggplotly(p, tooltip="text")%>%layout(legend = list(orientation = "h", x = 0.7, y = -0.15))
+pp
+```
+Key Points from this plot:
+
+*The results are extremely stark. 
+
+*It demonstrates to us clearly that the highest risk AG for accidents on our roads is the 25-34 AG, followed by the 35-44 AG.
+
+*More than half of these are car drivers. 
+
+*Thus we will separate the most high risk group of Road Users to analyze it further by Age Group.
+
+---
+
+####2.Are the least experienced Age Groups necessarily the highest risk? What is the ratio of male/female in these groups?
+
+The below plot is a circular bar plot representing car drivers for every Age Group.
+```{r, echo=FALSE}
+#View(casualty.data)
+drivers<-subset(casualty.data, (casualty.data$Road.User.Type=="Car drivers" & casualty.data$Statistic=="All Killed and Injured Casualties"))
+
+drivers<-drivers[!(drivers$Age.Group=="All ages" | drivers$Age.Group=="Age unknown"),]
+
+Road<-ggplot(data = drivers, mapping = aes(x= Age.Group, y= value, fill=Sex)) +geom_bar(stat="identity", position="dodge")+theme_stata()+
+  scale_fill_manual(values=c( "#E69F00", "#56B4E9"))
+Road<-Road+ggtitle("Accidents by age group, January to December 31st 2005 to 2018")
+
+Road<-Road+scale_x_discrete(labels = function(x) str_wrap(x, width = 7))
+Road<-Road+labs(x="Age Group", y="Number")
+Road<-Road+ coord_polar()
+Road
+
+```
+Key Points from the plot:
+
+*Again we see the highest group is 25-34.
+
+*Men have a higher number of driver accidents in every AG, except for the 45-54.
+
+*The highest number of accidents are attributed to the 25-34 years old AG.
+
+*You need to be at least 17 years old to learn to legally drive in Ireland.
+
+*Thus the most inexperienced legal drivers are the 18-20 AG and the 21-24 AG.
+
+*We may combine these to see if the collective sum is higher than the highest AG.
+
+----
+
+####Table to show driver statistics for all Age Groups
+
+```{r, echo=FALSE}
+one<-c(drivers$value[drivers$Age.Group=="0 - 5 years"])
+two<-c(drivers$value[drivers$Age.Group=="6 - 9 years"])
+three<-c(drivers$value[drivers$Age.Group=="10 - 14 years"])
+four<-c(drivers$value[drivers$Age.Group=="15 - 17 years"])
+five<-c(drivers$value[drivers$Age.Group=="18 - 20 years"])
+six<-c(drivers$value[drivers$Age.Group=="21 - 24 years"])
+seven<-c(drivers$value[drivers$Age.Group=="25 - 34 years"])
+eight<-c(drivers$value[drivers$Age.Group=="35 - 44 years"])
+nine<-c(drivers$value[drivers$Age.Group=="45 - 54 years"])
+ten<-c(drivers$value[drivers$Age.Group=="55 - 64 years"])
+eleven<-c(drivers$value[drivers$Age.Group=="65 years and over"])
+
+DT<-data.frame(
+Age=c("0-5","6-9","10-14","15-17", "18-20", "21-24", "25-34","35-44", "45-54", "55-64", "65+"),
+Means=c(mean(one), mean(two), mean(three), mean(four), mean(five), mean(six), mean(seven), mean(eight), mean(nine), mean(ten), mean(eleven)),
+Medians=c(median(one), median(two), median(three), median(four), median(five), median(six), median(seven), median(eight), median(nine), median(ten), median(eleven)),
+Maxes=c(max(one), max(two), max(three), max(four), max(five), max(six), max(seven), max(eight), max(nine), max(ten), max(eleven)),
+StDev=c(sd(one), sd(two), sd(three), sd(four), sd(five), sd(six), sd(seven), sd(eight), sd(nine), sd(ten), sd(eleven))
+)
+DT %>%
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+Key Points:
+
+*Sadly we see some outliers in the 0-5, 6-9 and 10-14 AG, meaning that there have been some driver casualties in these AGs in the years 2005-2018.
+
+*There seem to be some similarity in the mean sum of the 18-20 and 21-24 AG, and the 25-34 AG.
+
+*We will isolate these two groups and plot them to gauge equality.
+
+```{r}
+aggData <-aggregate(drivers$value, by=list(drivers$Year, drivers$Age.Group), FUN=sum, na.rm=TRUE)
+
+x<-c(aggData$x[aggData$Group.2=="18 - 20 years"] +aggData$x[aggData$Group.2=="21 - 24 years"])
+Group.2<-c(rep("18 - 24 years",14))
+Group.1<-c(2005:2018)
+combi<-data.frame(cbind(Group.1, Group.2, x))
+combi$Group.1 = as.factor(combi$Group.1)
+combi$Group.2 = as.factor(combi$Group.2)
+combi$x = as.double(combi$x)
+high<-aggData[aggData$Group.2=="25 - 34 years",]
+aggData1<-rbind(high, combi)
+
+names(aggData1)[names(aggData1) == "Group.2"] <- "Age.Group"
+
+data_summary <- function(x) {
+   m <- mean(x)
+   ymin <- m-sd(x)
+   ymax <- m+sd(x)
+   return(c(y=m,ymin=ymin,ymax=ymax))
+}
+
+ggplot(aggData1, aes(x=Age.Group, y=x, fill=Age.Group)) + geom_violin()+theme_stata()+
+  scale_fill_manual(values = c("#cc0000", "#093161"))+
+ggtitle("Distribution of serious accidents for 18-24 age group and 25-34 age group")+
+  labs(x="Age Group", y="Number")+
+stat_summary(fun.data=data_summary)
+```
+Key Points:
+
+*According to the above violin plot, the distribution of each age group per year is not equal. 
+
+*It appears as if the volume of accidents for the 25-34 age group is still higher, but the kernel density has some overlap.
+
+*The black dot represents the mean which looks quite close.
+
+---
+
+####Hypothesis Test
+
+Let us conduct a Hypothesis Test to discover whether the median of both AGs is equal or if there is significant difference between the two.
+
+As the distribution of accidents per age group is not normal, it does not meet the requirements for a t-test. 
+```{r, echo=false}
+merge<-c(combi$x)
+higher<-c(high$x)
+wilcox.test(higher,merge)
+```
+*The p-value is less than the significance level of 0.05.
+
+*We reject the null hypothesis.
+
+*We can conclude that the medians of the combined 18-24 age group and the 25-34 age group are significantly different.
+
+*Thus the highest risk driver AG is not the least experienced driver AG.
+
+----
+
+####3.What are the trends in Age Groups for ten years represented in the data?
+
+The 10 years which this data encompasses (2008-2018), a massive amount of change has been wrought.The RSA has run extensive road safety campaigns, and changes to public transport infrastructure and road building have occurred.
+
+We ask if any of this can be borne out in the data, represented in a time series graph below.
+
+```{r, echo=FALSE}
+
+aggData2 <-aggregate(casualty.data$value, by=list(casualty.data$Year, casualty.data$Age.Group), FUN=sum, na.rm=TRUE)
+
+aggData2<-aggData2[!(aggData2$Group.1=="2005" | aggData2$Group.1=="2006" |
+aggData2$Group.1=="2007"),]
+
+names(aggData2)[names(aggData2) == "Group.1"] <- "Year"
+names(aggData2)[names(aggData2) == "Group.2"] <- "Age.Group"
+names(aggData2)[names(aggData2) == "x"] <- "Count"
+
+aggData2<-aggData2[!(aggData2$Age.Group=="All ages"),]
+
+ggplot(aggData2, aes(Year, Count, group=Age.Group, color=Age.Group)) + 
+  geom_line(size=2) +
+  scale_color_manual(values = c("#006600","#cc0000", "#cc0099",  "#8080ff", "#bf80ff", "#E7B800", "#ff0066","#5900b3", "#269900", "#00AFBB", "#ffff1a","#00FF00"))+
+  theme_stata()+
+  ggtitle("Incidence of accidents per age group for 10 years 2008-2018")+
+  scale_fill_discrete(name="Age Groups")
+```
+Key points:
+
+*The overall trend of serious accidents has decreased from 2008 to 2018. 
+
+*The three highest risk age groups 18-20, 21-24 and 25-34 have lowered significantly. 
+
+*However, the four oldest age groups 35-44, 45-54, 55-64 and 65 and over have all increased. 
+```{r}
+#install.packages("dygraphs")
+library(dygraphs)
+library(xts)
+
+#aggData2 <-aggregate(casualty.data$value, by=list(casualty.data$Year, casualty.data$Age.Group), FUN=sum, na.rm=TRUE)
+
+#aggData2<-aggData2[!(aggData2$Group.1=="2005" | aggData2$Group.1=="2006" |
+#aggData2$Group.1=="2007"),]
+
+#names(aggData2)[names(aggData2) == "Group.1"] <- "Year"
+#names(aggData2)[names(aggData2) == "Group.2"] <- "Age.Group"
+#names(aggData2)[names(aggData2) == "x"] <- "Count"
+
+#aggData2<-aggData2[!(aggData2$Age.Group=="All ages"),]
+
+aggData2<-aggData2[,c("Age.Group", "Count")]
+first<-subset(aggData2, Age.Group=="0 - 5 years")
+second<-subset(aggData2, Age.Group=="6 - 9 years")
+third<-subset(aggData2, Age.Group=="10 - 14 years")
+fourth<-subset(aggData2, Age.Group=="15 - 17 years")
+fifth<-subset(aggData2, Age.Group=="18 - 20 years")
+sixth<-subset(aggData2, Age.Group=="21 - 24 years")
+seventh<-subset(aggData2, Age.Group=="25 - 34 years")
+eighth<-subset(aggData2, Age.Group=="35 - 44 years")
+ninth<-subset(aggData2, Age.Group=="45 - 54 years")
+tenth<-subset(aggData2, Age.Group=="55 - 64 years")
+eleventh<-subset(aggData2, Age.Group=="65 years and over")
+twelfth<-subset(aggData2, Age.Group=="Age unknown")
+ages<-cbind(first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth, eleventh, twelfth)
+ages<-ages[,-c(1,3,5,7,9,11,13,15,17,19,21,23)]
+timeSeries<-ts(ages, start = 2008, end = 2018, frequency = 1)
+
+d<-dygraph(timeSeries)%>%
+  dySeries("Count", label = "0-5 years") %>%
+  dySeries("Count.1", label = "6-9 years") %>%
+  dySeries("Count.2", label = "10-14 years") %>%
+  dySeries("Count.3", label = "15-17 years") %>%
+  dySeries("Count.4", label = "18-20 years") %>%
+  dySeries("Count.5", label = "21-24 years") %>%
+  dySeries("Count.6", label = "25-34 years") %>%
+  dySeries("Count.7", label = "35-44 years") %>%
+  dySeries("Count.8", label = "45-54 years") %>%
+  dySeries("Count.9", label = "55-64 years") %>%
+  dySeries("Count.10", label = "65+ years") %>%
+  dySeries("Count.11", label = "Age unknown")
+
+
+
+```
+
+
+
